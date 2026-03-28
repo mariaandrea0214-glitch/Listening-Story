@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfect 10 Listening Challenge</title>
+    <style>
+        :root {
+            --primary: #4A90E2;
+            --success: #48BB78;
+            --error: #F56565;
+            --bg: #F0F4F8;
+            --dark: #2D3748;
+            --accent: #ED8936;
+        }
+
+        body {
+            font-family: 'Comic Sans MS', 'Chalkboard SE', cursive, sans-serif;
+            background-color: var(--bg);
+            color: var(--dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .game-container {
+            max-width: 650px;
+            width: 100%;
+            background: white;
+            padding: 30px;
+            border-radius: 30px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            text-align: center;
+            border: 6px solid #CBD5E0;
+        }
+
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 25px;
+            background: #E2E8F0;
+            padding: 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 1.4rem;
+        }
+
+        .score { color: #2F855A; }
+        .mistakes { color: #C53030; }
+
+        .question-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+
+        .q-btn {
+            padding: 18px 5px;
+            border: 4px solid var(--primary);
+            background: white;
+            color: var(--primary);
+            border-radius: 15px;
+            cursor: pointer;
+            font-weight: 900;
+            font-size: 1.3rem;
+            transition: 0.2s;
+        }
+
+        .q-btn.active { background: var(--primary); color: white; transform: scale(1.1); }
+        .q-btn.completed { opacity: 0.3; cursor: not-allowed; background: #A0AEC0; border-color: #718096; }
+
+        #audio-controls {
+            margin: 20px 0;
+            display: none;
+            padding: 20px;
+            background: #F7FAFC;
+            border-radius: 25px;
+            border: 3px dashed var(--primary);
+        }
+
+        .play-btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 20px 50px;
+            border-radius: 60px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            margin-bottom: 20px;
+            box-shadow: 0 6px 0 #C05621;
+        }
+
+        .play-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #C05621; }
+
+        .options-container {
+            display: none;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .option-btn {
+            flex: 1;
+            padding: 25px;
+            font-size: 1.4rem;
+            font-weight: bold;
+            border: 4px solid #E2E8F0;
+            border-radius: 20px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .option-btn.correct { background: var(--success) !important; color: white; border-color: #276749; }
+        .option-btn.wrong { background: var(--error) !important; color: white; border-color: #9B2C2C; }
+
+        #feedback {
+            margin-top: 20px;
+            font-weight: 900;
+            font-size: 1.8rem;
+            height: 40px;
+        }
+
+        #result-screen { display: none; }
+        .redo-msg { color: var(--error); }
+        .congrats-msg { color: var(--success); }
+
+        .restart-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            border-radius: 15px;
+            font-size: 1.3rem;
+            cursor: pointer;
+            margin-top: 30px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container" id="main-game">
+        <h1 style="color: var(--primary);">🔊 Listening Challenge</h1>
+        
+        <div class="stats-bar">
+            <div class="score">⭐ Score: <span id="score-val">0</span>/10</div>
+            <div class="mistakes">❌ Mistakes: <span id="mistakes-val">0</span></div>
+        </div>
+
+        <div class="question-grid" id="question-grid"></div>
+
+        <div id="audio-controls">
+            <button class="play-btn" onclick="playAudio()">▶️ Play Audio</button>
+            <div id="options" class="options-container">
+                <button class="option-btn" id="btnA" onclick="checkAnswer('A')"></button>
+                <button class="option-btn" id="btnB" onclick="checkAnswer('B')"></button>
+            </div>
+            <div id="feedback"></div>
+        </div>
+    </div>
+
+    <div class="game-container" id="result-screen">
+        <div id="result-icon" style="font-size: 5rem;"></div>
+        <h2 id="final-title" style="font-size: 2.5rem; margin-top: 0;"></h2>
+        <p id="final-stats" style="font-size: 1.5rem;"></p>
+        <p id="final-msg" style="font-size: 1.8rem; font-weight: bold;"></p>
+        <button class="restart-btn" id="action-btn" onclick="location.reload()"></button>
+    </div>
+
+    <script>
+        // Audio for SFX
+        const sfxCorrect = new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3');
+        const sfxWrong = new Audio('https://assets.mixkit.co/active_storage/sfx/2003/2003-preview.mp3');
+
+        /* TEACHER: Edit your 10 questions here */
+        const quizData = [
+            { audio: "q1.mp3", a: "Can you fly a kite?", b: "Can you ride a bike?", correct: "A" },
+            { audio: "q2.mp3", a: "Can you fly, Amy?", b: "Can you fly, Jello?", correct: "B" },
+            { audio: "q3.mp3", a: "Can you swim, Boka?", b: "Can you sing, Boka?", correct: "B" },
+            { audio: "q4.mp3", a: "Can you sing?", b: "Can you swim?", correct: "A" },
+            { audio: "q5.mp3", a: "Good job!", b: "Good!", correct: "A" },
+            { audio: "q6.mp3", a: "Wow!", b: "Hooray!", correct: "B" },
+            { audio: "q7.mp3", a: "No, I can't.", b: "No, I can.", correct: "A" },
+            { audio: "q8.mp3", a: "Oh, no!", b: "Oh! Please stop!", correct: "B" },
+            { audio: "q9.mp3", a: "Wait a minute.", b: "Wait!", correct: "A" },
+            { audio: "q10.mp3", a: "Yes, I can.", b: "Yes, I can't.", correct: "A" }
+        ];
+
+        let score = 0;
+        let mistakes = 0;
+        let currentQIndex = null;
+        let questionAudio = new Audio();
+        let answeredCount = 0;
+
+        const grid = document.getElementById('question-grid');
+        const audioControls = document.getElementById('audio-controls');
+        const optionsContainer = document.getElementById('options');
+        const feedback = document.getElementById('feedback');
+
+        // Setup 10 buttons
+        quizData.forEach((_, index) => {
+            const btn = document.createElement('button');
+            btn.className = 'q-btn';
+            btn.innerText = index + 1;
+            btn.onclick = () => loadQuestion(index, btn);
+            grid.appendChild(btn);
+        });
+
+        function loadQuestion(index, btnElement) {
+            if (btnElement.classList.contains('completed')) return;
+            document.querySelectorAll('.q-btn').forEach(b => b.classList.remove('active'));
+            btnElement.classList.add('active');
+            
+            currentQIndex = index;
+            questionAudio.src = quizData[index].audio;
+            
+            document.getElementById('btnA').innerText = "A: " + quizData[index].a;
+            document.getElementById('btnB').innerText = "B: " + quizData[index].b;
+            document.getElementById('btnA').className = "option-btn";
+            document.getElementById('btnB').className = "option-btn";
+            
+            feedback.innerText = "";
+            optionsContainer.style.display = "none";
+            audioControls.style.display = "block";
+        }
+
+        function playAudio() {
+            questionAudio.play().catch(() => alert("Audio file not found! Check your filenames."));
+            optionsContainer.style.display = "flex";
+        }
+
+        function checkAnswer(choice) {
+            const data = quizData[currentQIndex];
+            const btnA = document.getElementById('btnA');
+            const btnB = document.getElementById('btnB');
+            
+            if (btnA.classList.contains('correct') || btnA.classList.contains('wrong')) return;
+
+            if (choice === data.correct) {
+                score++;
+                sfxCorrect.play();
+                feedback.innerText = "EXCELLENT! 🌟";
+                feedback.style.color = "var(--success)";
+                document.getElementById(`btn${choice}`).classList.add('correct');
+            } else {
+                mistakes++;
+                sfxWrong.play();
+                feedback.innerText = "OH NO! ❌";
+                feedback.style.color = "var(--error)";
+                document.getElementById(`btn${choice}`).classList.add('wrong');
+                document.getElementById(`btn${data.correct}`).classList.add('correct');
+            }
+
+            document.getElementById('score-val').innerText = score;
+            document.getElementById('mistakes-val').innerText = mistakes;
+            
+            const activeBtn = document.querySelector('.q-btn.active');
+            activeBtn.classList.remove('active');
+            activeBtn.classList.add('completed');
+            answeredCount++;
+            
+            if (answeredCount === quizData.length) {
+                setTimeout(showFinalResults, 1500);
+            }
+        }
+
+        function showFinalResults() {
+            document.getElementById('main-game').style.display = "none";
+            const screen = document.getElementById('result-screen');
+            screen.style.display = "block";
+            
+            const title = document.getElementById('final-title');
+            const msg = document.getElementById('final-msg');
+            const icon = document.getElementById('result-icon');
+            const btn = document.getElementById('action-btn');
+            
+            document.getElementById('final-stats').innerText = `You got ${score} out of 10 correct!`;
+
+            if (score === 10) {
+                icon.innerText = "🏆";
+                title.innerText = "CONGRATULATIONS!";
+                title.className = "congrats-msg";
+                msg.innerText = "You are a listening master! Perfect score!";
+                btn.innerText = "Play Again";
+            } else {
+                icon.innerText = "⚠️";
+                title.innerText = "TRY AGAIN!";
+                title.className = "redo-msg";
+                msg.innerText = "You made at least one mistake. You must get 10/10 to pass!";
+                btn.innerText = "Try Again";
+            }
+        }
+    </script>
+</body>
+</html>
